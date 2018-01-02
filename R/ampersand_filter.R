@@ -19,6 +19,7 @@ ampersand_filter <- function() {
   # write(ast, "~/ast_test2.txt")
 
   write(ast, stdout())
+  utils::flush.console()
   closeAllConnections()
 
   # replace_ampersand <- function(x) {
