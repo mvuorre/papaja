@@ -20,7 +20,7 @@ ampersand_filter <- function() {
   write(ast, "~/ast_test2.txt")
   write(Encoding(ast), "~/ast_encoding.txt", append = TRUE)
 
-  ast <- iconv(ast, to = "UTF-8")
+  ast <- enc2native(ast)
   write(ast, "~/ast_test3.txt")
   write(Encoding(ast), "~/ast_encoding.txt", append = TRUE)
 
