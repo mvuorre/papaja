@@ -2,16 +2,40 @@
 % Please edit documentation in R/printnum.R
 \name{printnum}
 \alias{printnum}
-\alias{printp}
+\alias{printnum.default}
+\alias{printnum.list}
+\alias{printnum.integer}
+\alias{printnum.numeric}
+\alias{printnum.data.frame}
+\alias{printnum.labelled}
 \title{Prepare numeric values for printing}
 \usage{
-printnum(x, gt1 = TRUE, zero = TRUE, margin = 1,
+printnum(x, ...)
+
+\method{printnum}{default}(x, na_string = getOption("papaja.na_string"), ...)
+
+\method{printnum}{list}(x, ...)
+
+\method{printnum}{integer}(x, numerals = TRUE, capitalize = FALSE,
   na_string = getOption("papaja.na_string"), ...)
 
-printp(x, na_string = "")
+\method{printnum}{numeric}(x, gt1 = TRUE, zero = TRUE, margin = 1,
+  na_string = getOption("papaja.na_string"), use_math = TRUE, ...)
+
+\method{printnum}{data.frame}(x, ...)
+
+\method{printnum}{labelled}(x, ...)
 }
 \arguments{
 \item{x}{Numeric. Can be either a single value, vector, or matrix.}
+
+\item{...}{Further arguments that may be passed to \code{\link{formatC}}}
+
+\item{na_string}{Character. String to print if element of \code{x} is \code{NA}.}
+
+\item{numerals}{Logical. Indicates if integer should be returned as words.}
+
+\item{capitalize}{Logical. Indicates if first letter should be capitalized. Ignored if \code{numberals = TURE}.}
 
 \item{gt1}{Logical. Indicates if the absolute value of the statistic can, in principal, greater than 1.}
 
@@ -20,9 +44,8 @@ printp(x, na_string = "")
 \item{margin}{Integer. If \code{x} is a matrix, the function is applied either across rows (\code{margin = 1})
 or columns (\code{margin = 2}).}
 
-\item{na_string}{Character. String to print if element of \code{x} is \code{NA}.}
-
-\item{...}{Further arguments that may be passed to \code{\link{formatC}}}
+\item{use_math}{Logical. Indicates whether to insert \code{$} into the output so that \code{Inf} or scientific
+notation is rendered correctly.}
 }
 \description{
 Converts numeric values to character strings for reporting.
@@ -33,11 +56,6 @@ If \code{x} is a vector, \code{digits}, \code{gt1}, and \code{zero} can be vecto
    exceeds length of the parameter vectors. If \code{x} is a matrix, the vectors specify the formating
    of either rows or columns according to the value of \code{margin}.
 }
-\section{Functions}{
-\itemize{
-\item \code{printp}: Convenience wrapper for \code{printnum} to print p-values with three decimal places.
-}}
-
 \examples{
 printnum(1/3)
 printnum(1/3, gt1 = FALSE)

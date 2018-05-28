@@ -4,8 +4,10 @@
 #' an \code{appendix} environment.
 #'
 #' @param x Character. Input file name.
-#' @param options Character. Vector of options passed to \code{\link[rmarkdown]{pandoc_convert}}.
+#' @param bibliography Character. Location of bibliography file(s) to use.
+#' @param csl Character. Location of CSL file to use. Defaults to APA-style.
 #' @param quiet Logical. Suppresses pandoc command line output; see \code{\link[rmarkdown]{render}}.
+#' @param options Character. Vector of options passed to \code{\link[rmarkdown]{pandoc_convert}}.
 #'    If \code{FALSE} output will be included in the document.
 #' @details
 #'    By default \code{x} is converted to a TeX file which can be included in an R Markdown document
@@ -29,11 +31,35 @@
 
 render_appendix <- function(
   x
-  , options = NULL
+  , bibliography = rmarkdown::metadata$bibliography
+  , csl = rmarkdown::metadata$csl
   , quiet = TRUE
+  , options = NULL
 ) {
   validate(x, check_class = "character", check_length = 1)
-  if(!is.null(options)) validate(options, check_class = "character")
+
+  if(length(bibliography) > 0) {
+    validate(bibliography, check_class = "character")
+    bib_call <- paste0("--bibliography=", bibliography)
+  }
+
+  if(length(csl) > 0) {
+    validate(csl, check_class = "character", check_length = 1)
+  } else {
+    csl <- system.file(
+      "rmd", "apa6.csl"
+      , package = "papaja"
+    )
+  }
+  csl_call <- paste0("--csl=", csl)
+
+  if(!is.null(options)) {
+    validate(options, check_class = "character")
+    options <- c(options, bib_call, csl_call)
+  } else if(length(bibliography) > 0) {
+    options <- c(bib_call, csl_call)
+  }
+
   validate(quiet, check_class = "logical", check_length = 1)
 
 
@@ -45,11 +71,12 @@ render_appendix <- function(
     # Render Markdown fragment
     md_fragment <- knitr::knit_child(text = readLines(x), quiet = quiet)
 
-    ## Remove placement options
-    if(!rmarkdown::metadata$figsintext) {
-      md_fragment <- gsub("(\\\\begin\\{table\\})(\\[.+?\\])", "\\1", md_fragment)
-      md_fragment <- gsub("(\\\\begin\\{figure\\})(\\[.+?\\])", "\\1", md_fragment)
-    }
+    # # Remove placement options
+    # # if (and only if) class: man and figsintext: no
+    # if(!rmarkdown::metadata$figsintext && grepl("man", rmarkdown::metadata$class)) {
+    #   md_fragment <- gsub("(\\\\begin\\{table\\})(\\[.+?\\])", "\\1", md_fragment)
+    #   md_fragment <- gsub("(\\\\begin\\{figure\\})(\\[.+?\\])", "\\1", md_fragment)
+    # }
 
     md_file <- paste0(tools::file_path_sans_ext(x), ".md")
     write(md_fragment, file = md_file, sep = "\n")
@@ -65,10 +92,14 @@ render_appendix <- function(
     )
 
     # Add appendix environment
-    tex <- readLines(new_name)
-    if(!grepl("\\\\section", tex[tex != ""][1])) tex <- c("\\section{}", tex) # Add section to start appendix
-    tex <- c("\\clearpage\n\n\\begin{appendix}", tex, "\\end{appendix}")
-    tex <- gsub("\\\\begin\\{figure\\}\\[htbp\\]", "\\\\begin{figure}", tex) # Remove placement option
+    tex <- readLines(new_name, encoding = "UTF-8")
+    if(!grepl("\\\\section|\\\\hypertarget", tex[tex != ""][1])) tex <- c("\\section{}", tex) # Add section to start appendix
+    appendix_endfloat_fix <- ifelse(
+      grepl("man", rmarkdown::metadata$classoption) || grepl("man", rmarkdown::metadata$class)
+      , "\\makeatletter\n\\efloat@restorefloats\n\\makeatother"
+      , ""
+    )
+    tex <- c("\\clearpage", appendix_endfloat_fix, "\n\n\\begin{appendix}", tex, "\\end{appendix}")
 
     write(tex, file = new_name)
     file.remove(md_file)

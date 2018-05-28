@@ -2,36 +2,52 @@
 % Please edit documentation in R/apa_table.R
 \name{apa_table}
 \alias{apa_table}
-\alias{apa_table.latex}
-\alias{apa_table.word}
+\alias{apa_table.apa_results_table}
+\alias{apa_table.matrix}
+\alias{apa_table.list}
+\alias{apa_table.data.frame}
 \title{Prepare table for printing}
 \usage{
-apa_table(x, caption = NULL, note = NULL, stub_indents = NULL,
-  added_stub_head = NULL, col_spanners = NULL, midrules = NULL,
-  placement = "tbp", landscape = FALSE, small = FALSE,
-  na_string = getOption("papaja.na_string"), escape = NULL, ...)
+apa_table(x, ...)
 
-apa_table.latex(x, caption = NULL, note = NULL, col_spanners = NULL,
+\method{apa_table}{apa_results_table}(x, escape = FALSE, ...)
+
+\method{apa_table}{matrix}(x, caption = NULL, note = NULL,
+  stub_indents = NULL, added_stub_head = NULL, col_spanners = NULL,
   midrules = NULL, placement = "tbp", landscape = FALSE, small = FALSE,
-  ...)
+  escape = TRUE, format.args = NULL, ...)
 
-apa_table.word(x, caption = NULL, note = NULL, ...)
+\method{apa_table}{list}(x, caption = NULL, note = NULL,
+  stub_indents = NULL, added_stub_head = NULL, col_spanners = NULL,
+  midrules = NULL, placement = "tbp", landscape = FALSE, small = FALSE,
+  escape = TRUE, merge_method = "indent", format.args = NULL, ...)
+
+\method{apa_table}{data.frame}(x, caption = NULL, note = NULL,
+  stub_indents = NULL, added_stub_head = NULL, col_spanners = NULL,
+  midrules = NULL, placement = "tbp", landscape = FALSE, small = FALSE,
+  escape = TRUE, format.args = NULL, ...)
 }
 \arguments{
 \item{x}{Object to print, can be \code{matrix}, \code{data.frame}, or \code{list}. See details.}
+
+\item{...}{Further arguments to pass to \code{\link[knitr]{kable}}.}
+
+\item{escape}{Logical. If \code{TRUE} special LaTeX characters, such as \code{\%} or \code{_}, in
+column names, row names, caption, note and table contents are escaped.}
 
 \item{caption}{Character. Caption to be printed above the table.}
 
 \item{note}{Character. Note to be printed below the table.}
 
-\item{stub_indents}{List. A named list of vectors of length 2 giving the first and second row to
-indent. Names of list elements will be used as titles for indented sections.}
+\item{stub_indents}{List. A named list of vectors that contain indeces of the rows to indent. The name
+of each list element containing the vector is used as title for indented sections.}
 
 \item{added_stub_head}{Character. Used as stub head (name of first column) if \code{row.names = TRUE}
 is passed to \code{\link[knitr]{kable}}; ignored if row names are omitted from the table.}
 
-\item{col_spanners}{List. A named list of vectors of length 2 giving the first and second column to
-span with a grouping column name.}
+\item{col_spanners}{List. A named list of vectors of length 2 that contain the first and last column to
+span. The name of each list element containing the vector is used as grouping column name. Ignored
+in MS Word documents.}
 
 \item{midrules}{Numeric. Vector of line numbers in table (not counting column headings) that should be
 followed by a horizontal rule; ignored in MS Word documents.}
@@ -44,18 +60,19 @@ and in MS Word documents.}
 \item{landscape}{Logical. If \code{TRUE} the table is printed in landscape format; ignored in MS Word
 documents.}
 
-\item{small}{Logical. If \code{TRUE} the font size of the table content is reduced.}
+\item{small}{Logical. If \code{TRUE} the font size of the table content is reduced. Ignored in MS Word documents.}
 
-\item{na_string}{Character. String to print if element of \code{x} is \code{NA}.}
+\item{format.args}{List. A named list of arguments to be passed to \code{\link{printnum}} to format numeric values.}
 
-\item{...}{Further arguments to pass to \code{\link[knitr]{kable}}.}
+\item{merge_method}{Character. Determines how to merge tables if \code{x} is a \code{list}. Can be either
+\code{indent} or \code{table_spanner}.}
 }
 \description{
 Formats \code{matrices} and \code{data.frames} to report them as tables according to APA guidelines
 (6th edition).
 }
 \details{
-When using \code{apa_table()}, the type of the output (LaTeX or MS Word) is determined automatically
+When using \code{apa_table}, the type of the output (LaTeX or MS Word) is determined automatically
    by the rendered document type. If no rendering is in progress the output default is LaTeX.
    The chunk option of the enveloping chunk has to be set to \code{results = "asis"} to ensure the table
    is rendered, otherwise the table-generating markup is printed.
@@ -65,18 +82,31 @@ When using \code{apa_table()}, the type of the output (LaTeX or MS Word) is dete
 }
 \examples{
 
-my_table <- apply(cars, 2, function(x) # Create data
-   round(c(Mean = mean(x), SD = sd(x), Min = min(x), Max = max(x)), 2)
+my_table <- t(apply(cars, 2, function(x) # Create data
+  round(c(Mean = mean(x), SD = sd(x), Min = min(x), Max = max(x)), 2)
+))
+
+apa_table(
+  my_table
+  , align = c("l", rep("r", 3))
+  , caption = "A summary table of the cars dataset."
 )
 
 apa_table(
-   my_table
-   , align = c("l", "r", "r")
-   , caption = "A summary table of the cars dataset."
-   , note = "This table was created using apa\\\\_table()"
-   , added_stub_head = "Descriptives"
+  cbind(my_table, my_table)
+  , align = c("l", rep("r", 8))
+  , caption = "A summary table of the cars dataset."
+  , note = "This table was created using apa\\\\_table()"
+  , added_stub_head = "Variables"
+  , col_spanners = list(`Cars 1` = c(2, 5), `Cars 2` = c(6, 9))
+)
+
+apa_table(
+  list(`Cars 1` = my_table, `Cars 2` = my_table)
+  , caption = "A summary table of the cars dataset."
+  , added_stub_head = "Variables"
 )
 }
 \seealso{
-\code{\link[knitr]{kable}}
+\code{\link[knitr]{kable}}, \code{\link{printnum}}
 }

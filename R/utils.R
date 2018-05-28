@@ -15,6 +15,7 @@
 #' @param check_cols Character. Vector of columns that are intended to be in a \code{data.frame}.
 #'
 #' @importFrom methods is
+#' @keywords internal
 #' @examples
 #' \dontrun{
 #' in_paren <- TRUE # Taken from printnum()
@@ -42,7 +43,7 @@ validate <- function(
   if(!is.null(check_dim) && !all(dim(x) == check_dim)) stop(paste("The parameter '", name, "' must have dimensions " , paste(check_dim, collapse=""), ".", sep = ""))
   if(!is.null(check_length) && length(x) != check_length) stop(paste("The parameter '", name, "' must be of length ", check_length, ".", sep = ""))
 
-  if(!check_class=="function"&&any(is.na(x))) {
+  if(!check_class == "function" && any(is.na(x))) {
     if(check_NA) stop(paste("The parameter '", name, "' is NA.", sep = ""))
     else return(TRUE)
   }
@@ -85,6 +86,7 @@ validate <- function(
 #'      \item{\code{full_report}}{A (named list of) character strings comprised of \code{estimate} and \code{statistic} for each factor.}
 #'      \item{\code{table}}{A \code{data.frame} containing all results; can, for example, be passed to \code{\link{apa_table}}.}
 #'    }
+#' @keywords internal
 
 apa_print_container <- function() {
   list(
@@ -105,13 +107,13 @@ apa_print_container <- function() {
 #' @param newlines Logical. Determines if \code{\\n} are escaped.
 #' @param spaces Logical. Determines if multiple spaces are escaped.
 #'
+#' @keywords internal
 #' @examples
 #' \dontrun{
 #' in_paren <- TRUE # Taken from printnum()
 #' validate(in_paren, check_class = "logical", check_length = 1)
 #' validate(in_paren, check_class = "numeric", check_length = 1)
 #' }
-
 
 escape_latex <- function (x, newlines = FALSE, spaces = FALSE) {
   if(is.null(x)) return(x)
@@ -137,6 +139,7 @@ escape_latex <- function (x, newlines = FALSE, spaces = FALSE) {
 #'
 #' @param x Character.
 #'
+#' @keywords internal
 #' @examples
 #' \dontrun{
 #' convert_stat_name("rho")
@@ -182,8 +185,11 @@ convert_stat_name <- function(x) {
 #'    and confidence region bounds as column names (e.g. "2.5 \%" and "97.5 \%") and coefficient names as row names.
 #' @param conf_level Numeric. Vector of length 2 giving the lower and upper bounds of the confidence region in case
 #'    they cannot be determined from column names or attributes of \code{x}.
+#' @param use_math Logical. Indicates whether to insert \code{$} into the output so that \code{Inf} or scientific
+#'    notation is rendered correctly.
 #' @param ... Arguments to pass to \code{\link{printnum}}.
 #'
+#' @keywords internal
 #' @seealso \code{\link{printnum}}
 #' @examples
 #' \dontrun{
@@ -193,6 +199,7 @@ convert_stat_name <- function(x) {
 print_interval <- function(
   x
   , conf_level = NULL
+  , use_math = FALSE
   , interval_type
   , ...
 ) {
@@ -200,7 +207,7 @@ print_interval <- function(
   validate(interval_type, check_class = "character", check_length = 1)
 
   if(is.data.frame(x)) x <- as.matrix(x)
-  ci <- printnum(x, ...)
+  ci <- printnum(x, use_math = use_math, ...)
 
   if(!is.null(attr(x, "conf.level"))) conf_level <- attr(x, "conf.level")
 
@@ -231,8 +238,6 @@ print_interval <- function(
     for(i in 1:length(terms)) {
       apa_ci[[terms[i]]] <- paste0(conf_level, "$[", paste(ci[i, ], collapse = "$, $"), "]$")
     }
-
-    apa_ci <- lapply(apa_ci, function(x) sub("$\\infty$", "\\infty", x, fixed = TRUE)) # Fix extra $
 
     if(length(apa_ci) == 1) apa_ci <- unlist(apa_ci)
     return(apa_ci)
@@ -265,6 +270,7 @@ print_hdint <- function(
 #' @param standardized Logical. If \code{TRUE} the name of the function \code{\link{scale}} will be
 #'    removed from term names.
 #'
+#' @keywords internal
 #' @examples
 #' \dontrun{
 #' sanitize_terms(c("(Intercept)", "Factor A", "Factor B", "Factor A:Factor B", "scale(FactorA)"))
@@ -289,6 +295,7 @@ sanitize_terms <- function(x, standardized = FALSE) {
 #'
 #' @examples
 #' NULL
+#' @keywords internal
 
 prettify_terms <- function(x, standardized = FALSE) {
   if(standardized) x <- gsub("scale\\(", "", x)       # Remove scale()
@@ -297,9 +304,14 @@ prettify_terms <- function(x, standardized = FALSE) {
   x <- gsub("\\_|\\.", " ", x)                        # Remove underscores
   for (i in 1:length(x)) {
     x2 <- unlist(strsplit(x[i], split = ":"))
-    substring(x2, first = 1, last = 1) <- toupper(substring(x2, first = 1, last = 1))
+    x2 <- capitalize(x2)
     x[i] <- paste(x2, collapse = " $\\times$ ")
   }
+  x
+}
+
+capitalize <- function(x) {
+  substring(x, first = 1, last = 1) <- toupper(substring(x, first = 1, last = 1))
   x
 }
 
@@ -313,6 +325,7 @@ prettify_terms <- function(x, standardized = FALSE) {
 #' @param x List. A list of parameter values
 #' @param i Integer. The i-th element of each vector that is to be extracted.
 #'
+#' @keywords internal
 #' @examples
 #' NULL
 
@@ -329,6 +342,7 @@ sel <- function(x, i){
 #' @param ellipsis A \code{list}, usually a list that comes from an ellipsis
 #' @param set A named  \code{list} of parameters that are intended to be set.
 #' @param set.if.null A named \code{list} of parameters that are intended to be set if and only if the parameter is not already in \code{ellipsis}.
+#' @keywords internal
 
 defaults <- function(ellipsis, set = NULL, set.if.null = NULL) {
 
@@ -345,13 +359,13 @@ defaults <- function(ellipsis, set = NULL, set.if.null = NULL) {
 
 
 
-#' Sort ANOVA table by effects
+#' Sort ANOVA or regression table by predictors/effects
 #'
-#' Sorts rows in ANOVA table produced by \code{\link{apa_print}} by complexity (i.e., main effects,
-#' two-way interactions, three-way interactions, etc.).
+#' Sorts rows in ANOVA or regression tables produced by \code{\link{apa_print}}
+#' by complexity (i.e., main effects, two-way interactions, three-way interactions, etc.).
 #'
-#' @param x data.frame. An arbitrary data.frame with a column named "Effect", e.g., a table element
-#'    produced by \code{\link{apa_print}}.
+#' @param x data.frame. For example, a table element produced by \code{\link{apa_print}}.
+#' @param colname Character. Column name of the \code{data.frame} containing the terms to sort.
 #'
 #' @return Returns the same data.frame with reordered rows.
 #' @export
@@ -360,17 +374,20 @@ defaults <- function(ellipsis, set = NULL, set.if.null = NULL) {
 #' ## From Venables and Ripley (2002) p. 165.
 #' npk_aov <- aov(yield ~ block + N * P * K, npk)
 #' npk_aov_results <- apa_print(npk_aov)
-#' sort_effects(npk_aov_results$table)
+#' sort_terms(npk_aov_results$table, "Effect")
 
-sort_effects <- function(x) {
-  validate(x, check_class = "data.frame", check_cols = "Effect")
+sort_terms <- function(x, colname) {
+  validate(x, check_class = "data.frame", check_cols = colname)
 
-  x[order(sapply(regmatches(x$Effect, gregexpr("\\\\times", x$Effect)), length)), ]
+  x[order(sapply(regmatches(x[[colname]], gregexpr("\\\\times", x[[colname]])), length)), ]
 }
 
-
-
-# x List. Meta data of the document as a result from \code{\link[yaml]{yaml.load}}.
+#' Corresponding author line
+#'
+#' Internal function. Construct corresponding-author line.
+#'
+#' @param x List. Meta data of the document as a result from \code{\link[yaml]{yaml.load}}.
+#' @keywords internal
 
 corresponding_author_line <- function(x) {
   apa_terms <- getOption("papaja.terms")
@@ -388,8 +405,13 @@ corresponding_author_line <- function(x) {
   corresponding_line
 }
 
+#' Define phrases according to locale
+#'
+#' Internal function. Defines phrases used throughout the manuscript.
+#'
+#' @param x Integer. Locale.
+#' @keywords internal
 
-# Defines phrases used throughout the manuscript
 localize <- function(x) {
   switch(
     x
@@ -429,9 +451,23 @@ localize <- function(x) {
   )
 }
 
+#' Package available
+#'
+#' Internal function to check if a specified package is installed.
+
+#' @param x Character. Name of the package to be checked.
+#' @return Logical. Is the specified package installed?
+#' @keywords internal
+
 package_available <- function(x) x %in% rownames(utils::installed.packages())
 
 no_method <- function(x) {
   stop(paste0("Objects of class '", class(x), "' are currently not supported (no method defined).
               Visit https://github.com/crsh/papaja/issues to request support for this class."))
 }
+
+rename_column <- function(x, current_name, new_name) {
+  colnames(x)[colnames(x) %in% current_name] <- new_name
+  x
+}
+

@@ -26,22 +26,23 @@ wordcount: "Too lazy to count"
 
 bibliography      : ["references.bib", "r-references.bib"]
 
-figsintext        : yes
+floatsintext      : yes
 figurelist        : no
 tablelist         : no
 footnotelist      : no
 lineno            : yes
 linkcolor         : "blue"
+mask              : no
+draft             : no
 
-lang              : "english"
-class             : "man"
-output            : papaja::apa6_pdf
+classoption       : "man"
+output            : papaja::apa6_pdf # Use papaja::apa6_word for Word documents
 ---
 
 ```{r message = FALSE, warning = FALSE}
-library("papaja")
 library("dplyr")
 library("afex")
+library("papaja")
 
 load("../tests/testthat/data/mixed_data.rdata")
 ```
@@ -102,7 +103,6 @@ apa_table(
   descriptives
   , caption = "Descriptive statistics of correct recall by dosage."
   , note = "This table was created with apa_table()"
-  , escape = TRUE
 )
 ```
 
@@ -183,6 +183,7 @@ apa_table(
   , align = c("l", "r", "c", "r", "r", "r")
   , caption = "ANOVA table for the analyis of the example data set."
   , note = "This is a table created using apa\\_print() and apa\\_table()."
+  , escape = FALSE
 )
 ```
 
@@ -196,7 +197,7 @@ For other options see the [overview of the R Markdown citation syntax](http://rm
 
 The citation style is automatically set to APA style.
 If you need to use a different citation style, you can set in the YAML front matter by providing the `csl` parameter.
-See the [R Markdown documentation](http://R Markdown.rstudio.com/authoring_bibliographies_and_citations.html) and [Citation Style Language](http://citationstyles.org/) for further details.
+See the [R Markdown documentation](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html) and [Citation Style Language](http://citationstyles.org/) for further details.
 
 If you use RStudio, I have created an [easy-to-use add-in](https://github.com/crsh/citr) that facilitates inserting citations into a document.
 The relevant references will, of course, be added to the documents reference section automatically.

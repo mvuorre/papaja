@@ -8,10 +8,11 @@
 #' @param note Character. Note to be printed below the table.
 #' @param added_stub_head Character. Used as stub head (name of first column) if \code{row.names = TRUE}
 #'    is passed to \code{\link[knitr]{kable}}; ignored if row names are omitted from the table.
-#' @param col_spanners List. A named list of vectors of length 2 giving the first and second column to
-#'    span with a grouping column name.
-#' @param stub_indents List. A named list of vectors of length 2 giving the first and second row to
-#'    indent. Names of list elements will be used as titles for indented sections.
+#' @param col_spanners List. A named list of vectors of length 2 that contain the first and last column to
+#'    span. The name of each list element containing the vector is used as grouping column name. Ignored
+#'    in MS Word documents.
+#' @param stub_indents List. A named list of vectors that contain indeces of the rows to indent. The name
+#'    of each list element containing the vector is used as title for indented sections.
 #' @param midrules Numeric. Vector of line numbers in table (not counting column headings) that should be
 #'    followed by a horizontal rule; ignored in MS Word documents.
 #' @param placement Character. Indicates whether table should be placed at the exact location (\code{h}),
@@ -20,15 +21,16 @@
 #'    and in MS Word documents.
 #' @param landscape Logical. If \code{TRUE} the table is printed in landscape format; ignored in MS Word
 #'    documents.
-#' @param small Logical. If \code{TRUE} the font size of the table content is reduced.
-#' @param na_string Character. String to print if element of \code{x} is \code{NA}.
-#' @param escape Logical. If \code{TRUE} special LaTeX characters, such as \code{%} or \code{_}, in
-#'    column names, row names, caption, note and table contents are escaped. Default is \code{TRUE} if
-#'    target document format is PDF.
+#' @param small Logical. If \code{TRUE} the font size of the table content is reduced. Ignored in MS Word documents.
+#' @param escape Logical. If \code{TRUE} special LaTeX characters, such as \code{\%} or \code{_}, in
+#'    column names, row names, caption, note and table contents are escaped.
+#' @param format.args List. A named list of arguments to be passed to \code{\link{printnum}} to format numeric values.
+#' @param merge_method Character. Determines how to merge tables if \code{x} is a \code{list}. Can be either
+#'   \code{indent} or \code{table_spanner}.
 #' @param ... Further arguments to pass to \code{\link[knitr]{kable}}.
 #'
 #' @details
-#'    When using \code{apa_table()}, the type of the output (LaTeX or MS Word) is determined automatically
+#'    When using \code{apa_table}, the type of the output (LaTeX or MS Word) is determined automatically
 #'    by the rendered document type. If no rendering is in progress the output default is LaTeX.
 #'    The chunk option of the enveloping chunk has to be set to \code{results = "asis"} to ensure the table
 #'    is rendered, otherwise the table-generating markup is printed.
@@ -37,23 +39,54 @@
 #'    the first column giving the names of the list elements elements.
 #'
 #'
-#' @seealso \code{\link[knitr]{kable}}
+#' @seealso \code{\link[knitr]{kable}}, \code{\link{printnum}}
 #' @examples
 #'
-#' my_table <- apply(cars, 2, function(x) # Create data
-#'    round(c(Mean = mean(x), SD = sd(x), Min = min(x), Max = max(x)), 2)
+#' my_table <- t(apply(cars, 2, function(x) # Create data
+#'   round(c(Mean = mean(x), SD = sd(x), Min = min(x), Max = max(x)), 2)
+#' ))
+#'
+#' apa_table(
+#'   my_table
+#'   , align = c("l", rep("r", 3))
+#'   , caption = "A summary table of the cars dataset."
 #' )
 #'
 #' apa_table(
-#'    my_table
-#'    , align = c("l", "r", "r")
-#'    , caption = "A summary table of the cars dataset."
-#'    , note = "This table was created using apa\\_table()"
-#'    , added_stub_head = "Descriptives"
+#'   cbind(my_table, my_table)
+#'   , align = c("l", rep("r", 8))
+#'   , caption = "A summary table of the cars dataset."
+#'   , note = "This table was created using apa\\_table()"
+#'   , added_stub_head = "Variables"
+#'   , col_spanners = list(`Cars 1` = c(2, 5), `Cars 2` = c(6, 9))
+#' )
+#'
+#' apa_table(
+#'   list(`Cars 1` = my_table, `Cars 2` = my_table)
+#'   , caption = "A summary table of the cars dataset."
+#'   , added_stub_head = "Variables"
 #' )
 #' @export
 
-apa_table <- function(
+apa_table <- function(x, ...) {
+  UseMethod("apa_table", x)
+}
+
+apa_table.default <- function(x, ...) no_method(x)
+
+
+#' @rdname apa_table
+#' @export
+
+apa_table.apa_results_table <- function(x, escape = FALSE, ...) {
+  NextMethod(x, escape = FALSE, ...)
+}
+
+
+#' @rdname apa_table
+#' @export
+
+apa_table.matrix <- function(
   x
   , caption = NULL
   , note = NULL
@@ -64,18 +97,164 @@ apa_table <- function(
   , placement = "tbp"
   , landscape = FALSE
   , small = FALSE
-  , na_string = getOption("papaja.na_string")
-  , escape = NULL
+  , escape = TRUE
+  , format.args = NULL
   , ...
 ) {
-  if(is.null(x)) stop("The parameter 'x' is NULL. Please provide a value for 'x'")
+  x <- data.frame(
+    x
+    , check.names = FALSE
+    , fix.empty.names = FALSE
+    , stringsAsFactors = FALSE
+  )
+
+  apa_table(
+    x
+    , caption = caption
+    , note = note
+    , stub_indents = stub_indents
+    , added_stub_head = added_stub_head
+    , col_spanners = col_spanners
+    , midrules = midrules
+    , placement = placement
+    , landscape = landscape
+    , small = small
+    , escape = escape
+    , format.args = format.args
+    , ...
+  )
+}
+
+
+#' @rdname apa_table
+#' @export
+
+apa_table.list <- function(
+  x
+  , caption = NULL
+  , note = NULL
+  , stub_indents = NULL
+  , added_stub_head = NULL
+  , col_spanners = NULL
+  , midrules = NULL
+  , placement = "tbp"
+  , landscape = FALSE
+  , small = FALSE
+  , escape = TRUE
+  , merge_method = "indent"
+  , format.args = NULL
+  , ...
+) {
+  ellipsis <- list(...)
+  row_names <- if(is.null(ellipsis$row.names)) TRUE else ellipsis$row.names
+  validate(row_names, "row.names", check_class = "logical", check_length = 1)
+  validate(merge_method, "merge_method", check_class = "character", check_length = 1)
+
+  if(row_names) {
+    x <- lapply(
+      x
+      , add_row_names
+      , added_stub_head = added_stub_head
+    )
+  } else {
+    x <- lapply(
+      x
+      , data.frame
+      , check.names = FALSE
+      , fix.empty.names = FALSE
+      , stringsAsFactors = FALSE
+    )
+  }
+
+  if(!merge_method %in% c("indent", "table_spanner")) {
+    warning("merge_method '", merge_method, "' not supported. Defaulting to 'indent'.")
+    merge_method <- "indent"
+  }
+
+  if(!is.null(ellipsis$format)) {
+    output_format <- ellipsis$format
+  } else {
+    output_format <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+
+    # Render to latex by default; render_appendix() uses markdown_strict
+    if(length(output_format) == 0 || output_format == "markdown") output_format <- "latex"
+  }
+
+  if(merge_method == "table_spanner") {
+    if(output_format == "word") {
+      warning("merge_method '", merge_method, "' not supported for Word documents. Defaulting to 'indent'.")
+      merge_method <- "indent"
+    } else {
+      if(!is.null(names(x))) {
+        x <- mapply(
+          add_table_spanner
+          , x = x
+          , name = names(x)
+          , SIMPLIFY = FALSE
+        )
+      }
+      merged_table <- do.call(rbind.data.frame, x)
+      rownames(merged_table) <- NULL
+    }
+  }
+
+  list_indents <- list()
+
+  if(merge_method == "indent") {
+    merged_table <- do.call(rbind.data.frame, x)
+    rownames(merged_table) <- NULL
+
+    # Generate list of table indentations
+    if(!is.null(names(x))) {
+      list_indents <- lapply(x, function(x) 1:nrow(x))
+      for(i in seq_along(list_indents)[-1]) {
+        list_indents[[i]] <- list_indents[[i]] + max(list_indents[[i - 1]])
+      }
+    }
+  }
+
+  apa_table(
+    merged_table
+    , caption = caption
+    , note = note
+    , stub_indents = c(list_indents, stub_indents)
+    , added_stub_head = added_stub_head
+    , col_spanners = col_spanners
+    , midrules = midrules
+    , placement = placement
+    , landscape = landscape
+    , small = small
+    , escape = escape
+    , format.args = format.args
+    , ...
+  )
+}
+
+
+#' @rdname apa_table
+#' @export
+
+apa_table.data.frame <- function(
+  x
+  , caption = NULL
+  , note = NULL
+  , stub_indents = NULL
+  , added_stub_head = NULL
+  , col_spanners = NULL
+  , midrules = NULL
+  , placement = "tbp"
+  , landscape = FALSE
+  , small = FALSE
+  , escape = TRUE
+  , format.args = NULL
+  , ...
+) {
   if(!is.null(caption)) validate(caption, check_class = "character", check_length = 1)
   if(!is.null(note)) validate(note, check_class = "character", check_length = 1)
   if(!is.null(added_stub_head)) validate(added_stub_head, check_class = "character", check_length = 1)
   if(!is.null(stub_indents)) validate(stub_indents, check_class = "list")
-  if(!is.null(na_string)) validate(na_string, check_class = "character", check_length = 1)
-  if(!is.null(escape)) validate(escape, check_class = "logical", check_length = 1)
 
+  validate(escape, check_class = "logical", check_length = 1)
   validate(placement, check_class = "character", check_length = 1)
   validate(landscape, check_class = "logical", check_length = 1)
   validate(small, check_class = "logical", check_length = 1)
@@ -83,52 +262,29 @@ apa_table <- function(
 
   # Set defaults and rename ellipsis arguments
   ellipsis <- list(...)
+
   row_names <- if(is.null(ellipsis$row.names)) TRUE else ellipsis$row.names
   validate(row_names, "row.names", check_class = "logical", check_length = 1)
-  digits <- if(is.null(ellipsis$digits)) 2 else ellipsis$digits
-  validate(digits, "digits", check_class = "numeric")
 
-  output_format <- knitr::opts_knit$get("rmarkdown.pandoc.to")
-  if(is.null(escape)) escape <- ifelse(!is.null(output_format), output_format == "latex", TRUE)
-
-  # List of tables?
-  if(is.list(x) && !is.data.frame(x)) {
-    # x <- lapply(x, as.data.frame, check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
-
-    ## Assemble table
-    if(row_names) {
-      prep_table <- lapply(x, add_row_names, added_stub_head = added_stub_head)
-    } else {
-      prep_table <- x # lapply(x, data.frame, check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
-    }
-
-    ## Round numeric cells
-    prep_table <- lapply(prep_table, round_cells, digits, na_string)
-
-    ## Assemble table
-    # Old table merging by adding an additional column is depricated for the moment
-#     prep_table <- merge_tables(
-#       x
-#       , empty_cells = ""
-#       , row_names = row_names
-#       , added_stub_head = added_stub_head
-#     )
-
-    prep_table <- do.call(rbind, prep_table)
-
-  } else {
-    # x <- as.data.frame(x, check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
-
-    ## Assemble table
-    if(row_names) {
-      prep_table <- add_row_names(x, added_stub_head = added_stub_head)
-    } else prep_table <- x # data.frame(x, check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
-
-    ## Round numeric cells
-    prep_table <- round_cells(prep_table, digits, na_string)
+  if(is.null(ellipsis$digits) & is.null(format.args$digits)) {
+    format.args$digits <- 2
+  } else if(!is.null(ellipsis$digits)) {
+    format.args$digits <- ellipsis$digits
   }
 
-  # Escape special characters
+  # Create variable labels if necessary
+  prep_table <- default_label(x)
+
+  # Assemble table
+  if(row_names) {
+    prep_table <- add_row_names(x, added_stub_head = added_stub_head)
+  } else {
+    prep_table <- x
+  }
+
+  prep_table <- format_cells(prep_table, format.args)
+
+  ## Escape special characters
   if(escape) {
     prep_table <- as.data.frame(lapply(prep_table, escape_latex, spaces = TRUE), check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
     colnames(prep_table) <- escape_latex(colnames(prep_table))
@@ -138,26 +294,22 @@ apa_table <- function(
     prep_table <- as.data.frame(lapply(prep_table, function(x) gsub("([^\\\\]+)(%)", "\\1\\\\%", x)), check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
   }
 
-  # Indent stubs
-  ## Indent individual tables
-  if(is.list(x) && !is.data.frame(x) && !is.null(names(x))) {
-    list_indents <- lapply(x, function(x) 1:nrow(x))
-    for(i in seq_along(list_indents)[-1]) list_indents[[i]] <- list_indents[[i]] + max(list_indents[[i - 1]])
-    prep_table <- indent_stubs(prep_table, list_indents, "\\ \\ \\ ")
-  }
-
+  ## Indent stubs
   if(!is.null(stub_indents)) prep_table <- indent_stubs(prep_table, stub_indents, "\\ \\ \\ ")
 
   # Fix ellipsis for further use
   ellipsis$escape <- FALSE
   ellipsis$row.names <- FALSE
 
-  # Pass to markup generating functions
+  ## Pass to markup generating functions
   if(!is.null(ellipsis$format)) {
     output_format <- ellipsis$format
     ellipsis$format <- NULL
   } else {
-    if(length(output_format) == 0 || output_format == "markdown") output_format <- "latex" # markdown_strict for render_appendix()
+    output_format <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+
+    # Render to latex by default; render_appendix() uses markdown_strict
+    if(length(output_format) == 0 || output_format == "markdown") output_format <- "latex"
   }
 
   if(output_format == "latex") {
@@ -193,8 +345,6 @@ apa_table <- function(
   }
 }
 
-#' @rdname apa_table
-#' @export
 
 apa_table.latex <- function(
   x
@@ -228,12 +378,19 @@ apa_table.latex <- function(
   if(!is.null(current_chunk)) caption <- paste0("\\label{tab:", current_chunk, "}", caption)
 
   # Center title row
-  colnames(x)[-1] <- paste0("\\multicolumn{1}{c}{", colnames(x), "}")[-1]
+  # If x doesn't have variable labels, yet, create them...
+  x <- default_label(x)
+  # ...so that you can overwrite colnames(x) with (potentially) a mixture of labels and names
+  colnames(x) <- paste0("\\multicolumn{1}{c}{", unlist(variable_label(x)), "}")
+  colnames(x)[1] <- if(!is.na(variable_label(x)[[1]])) variable_label(x)[[1]] else ""
 
   res_table <- do.call(function(...) knitr::kable(x, format = "latex", ...), ellipsis)
 
   table_lines <- unlist(strsplit(res_table, "\n"))
   table_lines <- table_lines[!grepl("\\\\addlinespace", table_lines)] # Remove \\addlinespace
+
+  # Fix table spanners
+  table_lines <- remove_excess_table_spanner_columns(table_lines)
 
   # Add column spanners
   if(!is.null(col_spanners)) table_lines <- add_col_spanners(table_lines, col_spanners, n_cols)
@@ -302,9 +459,6 @@ apa_table.latex <- function(
 }
 
 
-#' @rdname apa_table
-#' @export
-
 apa_table.word <- function(
   x
   , caption = NULL
@@ -313,18 +467,24 @@ apa_table.word <- function(
 ) {
   # Parse ellipsis
   ellipsis <- list(...)
+  # If x doesn't have variable labels, yet, create them...
+  x <- default_label(x)
+  # ...so that you can overwrite colnames(x) with (potentially) a mixture of labels and names
+  colnames(x) <- unlist(variable_label(x))
+  colnames(x)[1] <- if(!is.na(variable_label(x)[[1]])) variable_label(x)[[1]] else ""
+
   res_table <- do.call(function(...) knitr::kable(x, format = "pandoc", ...), ellipsis)
   apa_terms <- options()$papaja.terms
 
   caption <- paste0("*", caption, "*")
   current_chunk <- knitr::opts_current$get("label")
-  if(!is.null(current_chunk)) caption <- paste0("(\\#tab:", current_chunk, ")", caption)
+  if(!is.null(current_chunk)) caption <- paste0("<caption>(\\#tab:", current_chunk, ")</caption>\n\n<caption>", caption, "</caption>\n\n")
 
   # Print table
-  cat("<caption>")
+  # cat("<caption>")
   # cat(apa_terms$table, ". ", sep = "")
   cat(caption)
-  cat("</caption>\n")
+  # cat("</caption>\n")
 
   print(res_table)
 
@@ -338,28 +498,23 @@ apa_table.word <- function(
 }
 
 
-#' Round table cells
+#' Format numeric table cells
 #'
-#' Round all numeric cells of a table using \code{\link{printnum}}.
+#' Format all numeric cells of a table using \code{\link{printnum}}.
 #' \emph{This function is not exported.}
 #'
 #' @param x data.frame or matrix.
-#' @param digits Numeric. Vector of the number of digits to round numeric columns to.
-#' @param na_string Character. String to print if element of \code{x} is \code{NA}.
+#' @param format.args List. A named list of arguments to be passed to \code{\link{printnum}} to format numeric values.
 #'
+#' @keywords internal
 #' @seealso \code{\link{printnum}}
 #'
 #' @examples
 #' NULL
 
-round_cells <- function(x, digits = getOption("digits"), na_string = getOption("papaja.na_string")) {
-  n_col <- ncol(x)
-  digits <- rep(digits, length.out = n_col)
-
-  for(i in seq_len(n_col)) {
-    if(is.numeric(x[, i])) x[, i] <- printnum(x[, i], digits = digits[i], na_string = na_string)
-  }
-  x
+format_cells <- function(x, format.args = NULL) {
+  format.args$x <- x
+  do.call("printnum.data.frame", format.args)
 }
 
 
@@ -370,6 +525,7 @@ round_cells <- function(x, digits = getOption("digits"), na_string = getOption("
 #'
 #' @param x data.frame or matrix.
 #' @param added_stub_head Character. Used as stub head (name of first column).
+#' @keywords internal
 #' @seealso \code{\link{apa_table}}
 #'
 #' @examples
@@ -383,8 +539,10 @@ add_row_names <- function(x, added_stub_head) {
 
     if(!is.null(added_stub_head)) {
       colnames(mod_table) <- c(added_stub_head, colnames(x))
+      if(is(mod_table, "apa_results_table")) variable_label(mod_table[, 1]) <- added_stub_head
     } else {
       colnames(mod_table) <- c("", colnames(x))
+      if(is(mod_table, "apa_results_table")) variable_label(mod_table[, 1]) <- ""
     }
   } else mod_table <- data.frame(x, check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
 
@@ -402,13 +560,16 @@ add_row_names <- function(x, added_stub_head) {
 #' @param lines List. A named list of vectors of length 2 giving the first and second row to
 #'    indent. Names of list elements will be used as titles for indented sections.
 #' @param filler Character. Symbols used to indent stubs.
+#' @keywords internal
 #' @seealso \code{\link{apa_table}}
 #'
 #' @examples
 #' NULL
 
 indent_stubs <- function(x, lines, filler = "\ \ \ ") {
-  x <- as.data.frame(lapply(x, as.character), check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
+  # x <- lapply(x, function(y) default_label(data.frame(y, check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)))
+
+  # x <- as.data.frame(lapply(x, as.character), check.names = FALSE, fix.empty.names = FALSE, stringsAsFactors = FALSE)
 
   # Add indentation
   for(i in seq_along(lines)) {
@@ -439,6 +600,7 @@ indent_stubs <- function(x, lines, filler = "\ \ \ ") {
 #' @param table_lines Character. Vector of characters containing one line of a LaTeX table each.
 #' @param col_spanners List. A named list containing the indices of the first and last columns to group, where the names are the headings.
 #' @param n_cols Numeric. Number of columns of the table.
+#' @keywords internal
 #' @seealso \code{\link{apa_table}}
 #'
 #' @examples
@@ -450,17 +612,20 @@ add_col_spanners <- function(table_lines, col_spanners, n_cols) {
   multicols <- sapply(
     seq_along(col_spanners)
     , function(i, names) {
-      paste0("\\multicolumn{", diff(col_spanners[[i]]) + 1, "}{c}{", names[i], "}")
+      spanner_length <- diff(col_spanners[[i]])
+      if(length(spanner_length) == 0) spanner_length <- 0
+      paste0("\\multicolumn{", spanner_length + 1, "}{c}{", names[i], "}")
     }
     , names(col_spanners)
   )
 
   ## Calculate group distances
+  multicol_spanners <- vapply(col_spanners, length, 1) > 1
   n_ampersands <- c()
-  if(length(col_spanners) > 1) {
-    group_indices <- sort(unlist(col_spanners))
-    group_indices <- group_indices[-c(1, length(group_indices))] # Remove first and last column number
-    n_ampersands <- diff(group_indices)[-seq(from = 2, to = length(group_indices), by = 2)] # Remove differences between column numbers of the same group
+  if(sum(multicol_spanners) > 1) {
+    for(i in 2:length(col_spanners)) {
+        n_ampersands <- c(n_ampersands, min(col_spanners[[i]]) - max(col_spanners[[i - 1]]))
+    }
   }
   n_ampersands <- c(n_ampersands, 0)
 
@@ -472,7 +637,7 @@ add_col_spanners <- function(table_lines, col_spanners, n_cols) {
 
 
   group_headings <- c()
-  for(i in 1:(length(multicols))) {
+  for(i in 1:(length(col_spanners))) {
     group_headings <- paste(group_headings, multicols[i], paste(rep("&", n_ampersands[i]), collapse = " "))
   }
   group_headings <- paste(leading_amps, group_headings, trailing_amps, "\\\\", sep = "")
@@ -500,6 +665,21 @@ add_col_spanners <- function(table_lines, col_spanners, n_cols) {
 }
 
 
+add_table_spanner <- function(x, name, ...) {
+  name <- paste0("!!bs!!multicolumn!!ob!!", ncol(x), "!!cb!!!!ob!!c!!cb!!!!ob!!", name, "!!cb!!!!bs!!!!bs!!REMOVE!!REST")
+  table_spanner <- c(name, rep("", ncol(x)-1))
+  rbind(table_spanner, x)
+}
+
+remove_excess_table_spanner_columns <- function(x) {
+  table_spanner_rows <- which(grepl("REMOVE!!REST", x))
+  x[table_spanner_rows] <- gsub("REMOVE!!REST.*", "", x[table_spanner_rows])
+  x[table_spanner_rows] <- gsub("!!bs!!", "\\\\", x[table_spanner_rows])
+  x[table_spanner_rows] <- gsub("!!ob!!", "{", x[table_spanner_rows])
+  x[table_spanner_rows] <- gsub("!!cb!!", "}", x[table_spanner_rows])
+  x
+}
+
 #' Merge tables in list
 #'
 #' Takes a list of containing one or more \code{matrix} or \code{data.frame} and merges them into a single table.
@@ -511,6 +691,7 @@ add_col_spanners <- function(table_lines, col_spanners, n_cols) {
 #' @param row_names Logical. Vector of boolean values specifying whether to print column names for the corresponding list
 #'    element.
 #' @param added_stub_head Character. Vector of names for first unnamed columns. See \code{\link{apa_table}}.
+#' @keywords internal
 #' @seealso \code{\link{apa_table}}
 #'
 #' @examples

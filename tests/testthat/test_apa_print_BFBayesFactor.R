@@ -1,5 +1,7 @@
 context("apa_print.BFBayesFactor()")
 
+library("BayesFactor")
+
 test_that(
   "ttestBF(): One sample"
   , {
@@ -66,7 +68,8 @@ test_that(
     expect_equal(length(ttest_output$full), 1)
     expect_is(ttest_output$full, "character")
 
-    expect_equal(ttest_output$full, "$\\mathrm{BF}_{\\textrm{10}} = 1.27$, $M = -1.13$ 95\\% HDI $[-2.76$, $0.46]$")
+    expect_equal(ttest_output$full, "$M = -1.13$ 95\\% HDI $[-2.76$, $0.46]$, $\\mathrm{BF}_{\\textrm{10}} = 1.27$")
   }
 )
 
+detach("package:BayesFactor")

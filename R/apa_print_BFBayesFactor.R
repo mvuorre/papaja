@@ -2,15 +2,22 @@
 #'
 #' These methods take result objects from the \pkg{BayesFactor} package to create
 #'  formatted character strings to report the results in accordance with APA manuscript
-#'  guidelines.
+#'  guidelines. \emph{These methods are not properly tested and should be considered experimental.}
 #'
 #' @param x Output object. See details.
+#' @param iterations Numeric. Number of iterations of the MCMC sampler to estimate HDIs from the posterior.
+#' @param central_tendency Function to calculate central tendency of MCMC samples to obtain a point estimate from
+#'   the posterior.
+#' @param hdi Numeric. A single value (range [0, 1]) giving the credibility level of the HDI.
+#' @param standardized Logical. Indicates whether to return standardized or unstandardized effect size estimates.
 #' @param ratio_subscript Character. A brief description of the model comparison in the form of \code{"M1/M2"}.
-#' @param auto_inverse Logical. Indicates whether the Bayes factor should be inverted (including \code{ratio_subscript}) if it is less than 1.
+#' @param auto_invert Logical. Indicates whether the Bayes factor should be inverted (including \code{ratio_subscript}) if it is less than 1.
 #' @param scientific Logical. Indicates whether to use scientific notation.
+#' @param max Numeric. Upper limit of the Bayes factor before switching to scientific notation.
+#' @param min Numeric. Lower limit of the Bayes factor before switching to scientific notation.
 #' @param evidential_boost Numeric. Vector of the same length as \code{x} containing evidential boost factors for the
 #'   corresponding models (see details).
-#' @param ...
+#' @param ... Arguments passed to \code{\link{printnum}}
 #'
 #' @details For models with order restrictions, evidential boosts can be calculated based on the prior and posterior
 #'   odds of the restriction (Morey & Wagenmakers, 2014). If evidential boost factors are passed to
@@ -22,7 +29,7 @@
 #'   hypothesis tests. \emph{Statistics & Probability Letters}, 92, 121--124. doi:
 #'   \href{https://doi.org/10.1016/j.spl.2014.05.010}{10.1016/j.spl.2014.05.010}
 #' @family apa_print
-#' @importFrom stats formula terms setNames
+#' @importFrom stats formula terms setNames median
 #' @export
 #'
 #' @examples
@@ -44,28 +51,38 @@ apa_print.BFBayesFactor <- function(
   , central_tendency = median
   , hdi = 0.95
   , standardized = FALSE
+  , ratio_subscript = "10"
+  , auto_invert = TRUE
+  , scientific = TRUE
+  , max = 1000
+  , min = 1 / max
+  , evidential_boost = NULL
   , ...
 ) {
   if(length(x) > 1) {
     ellipsis <- list(...)
-    if(!is.null(ellipsis$evidential_boost)) evidential_boost <- ellipsis$evidential_boost
+    ellipsis$ratio_subscript <- ratio_subscript
+    ellipsis$auto_invert <- auto_invert
+    ellipsis$scientific <- scientific
+    ellipsis$max <- max
+    ellipsis$min <- min
 
     bf <- c()
     for(i in seq_along(x)) {
       ellipsis$x <- x[i]
-      if(!is.null(ellipsis$evidential_boost)) ellipsis$evidential_boost <- evidential_boost[i]
+      if(!is.null(evidential_boost)) ellipsis$evidential_boost <- evidential_boost[i]
       # bf[i] <- print_bf(x[i], ...)
-      bf[i] <- do.call("print_bf", ellipsis)
+      bf[i] <- do.call("apa_print_bf", ellipsis)
     }
     bf <- as.list(bf)
     names(bf) <- names(x)$numerator
-  } else bf <- print_bf(x, ...)
+  } else bf <- apa_print_bf(x, ...)
 
   apa_res <- apa_print_container()
   apa_res$statistic <- bf
 
   if(class(x@numerator[[1]]) %in% c("BFoneSample", "BFindepSample")) {
-    posterior_samples <- BayesFactor::posterior(x, iterations = iterations)
+    posterior_samples <- BayesFactor::posterior(x, index = 1, iterations = iterations)
     apa_res$estimate <- bf_estimates(
       x@numerator[[1]]
       , posterior_samples
@@ -102,7 +119,7 @@ apa_print.BFBayesFactorTop <- function(x, ...) {
   for(i in seq_along(x_BFBayesFactor)) {
     ellipsis$x <- x_BFBayesFactor[i]
     if(!is.null(ellipsis$evidential_boost)) ellipsis$evidential_boost <- evidential_boost[i]
-    bf <- c(bf, do.call("print_bf", ellipsis))
+    bf <- c(bf, do.call("apa_print_bf", ellipsis))
   }
 
   full_terms <- bf_term_labels(x@denominator)
@@ -129,7 +146,7 @@ setMethod("apa_print", "BFBayesFactorTop", apa_print.BFBayesFactorTop)
 #' @export
 
 apa_print.BFBayesFactorList <- function(x, ...) {
-  bf <- vapply(x, print_bf, as.character(as.vector(x[[1]])), ...)
+  bf <- vapply(x, apa_print_bf, as.character(as.vector(x[[1]])), ...)
   names(bf) <- names(x)
 
   apa_res <- apa_print_container()
@@ -144,11 +161,17 @@ apa_print.BFBayesFactorList <- function(x, ...) {
 setMethod("apa_print", "BFBayesFactorList", apa_print.BFBayesFactorList)
 
 
+apa_print_bf <- function(x, ...) {
+  UseMethod("apa_print_bf", x)
+}
 
-print_bf <- function(
+apa_print_bf.default <- function(x, ...) no_method(x)
+
+apa_print_bf.numeric <- function(
   x
   , ratio_subscript = "10"
   , auto_invert = TRUE
+  , escape = TRUE
   , scientific = TRUE
   , max = 1000
   , min = 1 / max
@@ -156,7 +179,7 @@ print_bf <- function(
   # , logbf = FALSE
   , ...
 ) {
-  validate(x@bayesFactor["bf"], check_NA = TRUE)
+  validate(x, check_NA = TRUE, check_infinite = FALSE)
   validate(ratio_subscript, check_class = "character", check_length = 1)
   validate(auto_invert, check_class = "logical", check_length = 1)
   validate(scientific, check_class = "logical", check_length = 1)
@@ -167,6 +190,7 @@ print_bf <- function(
 
   ellipsis <- list(...)
   ellipsis$x <- as.vector(x)
+  ellipsis$use_math <- FALSE
 
   if(!is.null(evidential_boost)) {
     ellipsis$x <- ellipsis$x * evidential_boost
@@ -180,11 +204,15 @@ print_bf <- function(
     ratio_subscript[to_invert] <- invert_subscript(ratio_subscript)
   }
 
+  if(escape) {
+    ratio_subscript <- paste0("\\textrm{", escape_latex(ratio_subscript), "}")
+  }
+
   if(scientific & (ellipsis$x > max - 1 | ellipsis$x < min)) {
     ellipsis$format <- "e"
     if(is.null(ellipsis$digits)) ellipsis$digits <- 2
 
-    bf <- do.call("formatC", ellipsis)
+    bf <- do.call("printnum", ellipsis)
     bf <- typeset_scientific(bf)
   } else {
     if(is.null(ellipsis$zero)) ellipsis$zero <- FALSE
@@ -193,7 +221,14 @@ print_bf <- function(
 
   if(!grepl("<|>", bf)) eq <- " = " else eq <- " "
 
-  bf <- paste0("$\\mathrm{BF}_{\\textrm{", ratio_subscript, "}}", eq, bf, "$")
+  bf <- paste0("$\\mathrm{BF}_{", ratio_subscript, "}", eq, bf, "$")
+  bf <- setNames(bf, names(x))
+  bf
+}
+
+apa_print_bf.BFBayesFactor <- function(x, ...) {
+  validate(as.vector(x), check_NA = TRUE)
+  bf <- apa_print_bf(as.vector(x))
   bf <- setNames(bf, names(x@numerator))
   bf
 }
@@ -201,7 +236,7 @@ print_bf <- function(
 
 invert_subscript <- function(x) {
   seperator <- if(nchar(x) == 2) "" else "/"
-  paste(rev(unlist(strsplit(x, seperator))), collapse = "")
+  paste0(rev(unlist(strsplit(x, seperator))), collapse = seperator)
 }
 
 typeset_scientific <- function(x) {
@@ -221,9 +256,14 @@ bf_sort_terms <- function(x) {
 }
 
 
-bf_estimates <- function(x, ...) no_method(x)
+# bf_estimates <- function(x, ...) UseMethod("bf_estimates", x)
 
-setGeneric("bf_estimates")
+# bf_estimates.default <- function(x, ...) no_method(x)
+
+setGeneric(
+  name = "bf_estimates"
+  , def = function(x, ...) standardGeneric("bf_estimates")
+)
 
 bf_estimates_ttest <- function(
   x
@@ -254,8 +294,17 @@ bf_estimates_ttest <- function(
   estimate
 }
 
-setMethod("bf_estimates", signature = "BFoneSample", bf_estimates_ttest)
-setMethod("bf_estimates", signature = "BFindepSample", bf_estimates_ttest)
+setMethod(
+  f = "bf_estimates"
+  , signature = "BFoneSample"
+  , definition = bf_estimates_ttest
+)
+
+setMethod(
+  f = "bf_estimates"
+  , signature = "BFindepSample"
+  , definition = bf_estimates_ttest
+)
 
 
 

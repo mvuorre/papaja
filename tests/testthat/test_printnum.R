@@ -83,27 +83,27 @@ test_that(
 
 
     # Data.frame
-    df_num <- as.data.frame(m_num)
+    df_num <- as.data.frame(m_num, stringsAsFactors = FALSE)
     colnames(df_num) <- paste0("Col", 1:2)
     apa_num <- printnum(df_num)
     expect_is(apa_num, "data.frame")
     expect_equal(dim(apa_num), c(4, 2))
 
-    df_correct <- as.data.frame(matrix(rep(c("0.00", "123.00", "0.10", "-12.00"), 2), ncol = 2))
+    df_correct <- as.data.frame(matrix(rep(c("0.00", "123.00", "0.10", "-12.00"), 2), ncol = 2), stringsAsFactors = FALSE)
     colnames(df_correct) <- colnames(df_num)
     expect_equivalent(apa_num, df_correct)
 
-    apa_num <- printnum(df_num, digits = c(2, 3), margin = 2)
-    df_correct <- as.data.frame(matrix(c("0.00", "123.00", "0.10", "-12.00", "0.000", "123.000", "0.100", "-12.000"), ncol = 2))
+    apa_num <- printnum(df_num, digits = c(2, 3))
+    df_correct <- as.data.frame(matrix(c("0.00", "123.00", "0.10", "-12.00", "0.000", "123.000", "0.100", "-12.000"), ncol = 2), stringsAsFactors = FALSE)
     colnames(df_correct) <- colnames(m_num)
     expect_equivalent(apa_num, df_correct)
 
-    apa_num <- printnum(df_num, digits = c(2, 3), margin = 1)
+    apa_num <- papaja:::printnum.numeric(df_num, digits = c(2, 3), margin = 1)
     df_correct <- as.data.frame(matrix(c("0.00", "123.000", "0.10", "-12.000", "0.00", "123.000", "0.10", "-12.000"), ncol = 2))
     colnames(df_correct) <- colnames(m_num)
     expect_equivalent(apa_num, df_correct)
 
-    expect_equivalent(printnum(as.data.frame(matrix(c(1, 2, NA, 4), ncol = 2))), as.data.frame(matrix(c("1.00", "2.00", "NA", "4.00"), ncol = 2)))
+    expect_equivalent(printnum(as.data.frame(matrix(c(1, 2, NA, 4), ncol = 2))), as.data.frame(matrix(c("1.00", "2.00", "NA", "4.00"), ncol = 2), stringsAsFactors = FALSE))
   }
 )
 
@@ -224,6 +224,30 @@ test_that(
     pvals <- matrix(c(0.0001, 0.049, 0.1, 1, -0.3))
     expect_error(printp(pvals))
     expect_error(printp(as.data.frame(pvals)))
+  }
+)
+
+test_that(
+  "Integers"
+  , {
+    expect_equal(printnum(1L, numerals = FALSE), "one")
+    expect_equal(printnum(10L, numerals = FALSE), "ten")
+    expect_equal(printnum(13L, numerals = FALSE), "thirteen")
+    expect_equal(printnum(50L, numerals = FALSE), "fifty")
+    expect_equal(printnum(23L, numerals = FALSE), "twenty-three")
+    expect_equal(printnum(100L, numerals = FALSE), "one hundred")
+    expect_equal(printnum(139L, numerals = FALSE), "one hundred and thirty-nine")
+    expect_equal(printnum(3871L, numerals = FALSE), "three thousand, eight hundred and seventy-one")
+    expect_equal(printnum(c(10000000L, 3L), numerals = FALSE), c("ten million", "three"))
+
+    expect_equal(printnum(100L, numerals = FALSE, capitalize = TRUE), "One hundred")
+  }
+)
+
+test_that(
+  "Lists"
+  , {
+    expect_equal(printnum(list(1.323, 1)), list("1.32", "1.00"))
   }
 )
 

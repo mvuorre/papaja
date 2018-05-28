@@ -8,6 +8,10 @@
 #' @param margin Integer. If \code{x} is a matrix, the function is applied either across rows (\code{margin = 1})
 #'    or columns (\code{margin = 2}).
 #' @param na_string Character. String to print if element of \code{x} is \code{NA}.
+#' @param use_math Logical. Indicates whether to insert \code{$} into the output so that \code{Inf} or scientific
+#'    notation is rendered correctly.
+#' @param numerals Logical. Indicates if integer should be returned as words.
+#' @param capitalize Logical. Indicates if first letter should be capitalized. Ignored if \code{numberals = TURE}.
 #' @param ... Further arguments that may be passed to \code{\link{formatC}}
 #' @details If \code{x} is a vector, \code{digits}, \code{gt1}, and \code{zero} can be vectors
 #'    according to which each element of the vector is formated. Parameters are recycled if length of \code{x}
@@ -24,12 +28,131 @@
 #' printp(0.0001)
 #' @export
 
-printnum <- function(
+printnum <- function(x, ...) {
+  UseMethod("printnum", x)
+}
+
+
+#' @rdname printnum
+#' @export
+
+printnum.default <- function(x, na_string = getOption("papaja.na_string"), ...) {
+  if(is.null(x)) stop("The parameter 'x' is NULL. Please provide a value for 'x'")
+  if(anyNA(x)){
+    rep(na_string, length(x))
+  } else {
+    as.character(x)
+  }
+  # Don't use printnum.numeric as a default if it only allows numeric input:
+  # printnum.numeric(x, ...)
+}
+
+
+#' @rdname printnum
+#' @export
+
+printnum.list <- function(x, ...) {
+  lapply(x, printnum, ...)
+}
+
+
+#' @rdname printnum
+#' @export
+
+printnum.integer <- function(x, numerals = TRUE, capitalize = FALSE, na_string = getOption("papaja.na_string"), ...) {
+  validate(x, check_integer = TRUE)
+  validate(numerals, check_class = "logical", check_length = 1)
+  validate(capitalize, check_class = "logical", check_length = 1)
+  validate(na_string, check_class = "character", check_length = 1)
+
+  if(numerals) return(x)
+  if(anyNA(x)) return(rep(na_string, length(x)))
+
+  # Based on a function that John Fox posted on the R mailing list
+  # http://tolstoy.newcastle.edu.au/R/help/05/04/2715.html
+
+  number_to_words <- function(x) {
+    single_digits <- c("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
+    names(single_digits) <- 0:9
+    teens <- c("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", " seventeen", "eighteen", "nineteen")
+    names(teens) <- 0:9
+    tens <- c("twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+    names(tens) <- 2:9
+    number_names <- c("thousand", "million", "billion", "trillion", "quadrillion", "quintillion", "sextillion", "septillion", "octillion", "nonillion", "decillion")
+
+    digits <- rev(strsplit(as.character(x), "")[[1]])
+    n_digits <- length(digits)
+    if(n_digits == 1) {
+      number <- as.vector(single_digits[digits])
+    } else if (n_digits == 2) {
+      if (x <= 19) {
+        number <- as.vector(teens[digits[1]])
+      } else {
+        number <- paste(
+          tens[digits[2]]
+          , Recall(as.numeric(digits[1]))
+          , sep = "-"
+        )
+      }
+    } else if(n_digits == 3) {
+      number <- paste(
+        single_digits[digits[3]]
+        , "hundred and"
+        , Recall(collapse(digits[2:1]))
+      )
+    } else {
+      required_number_word <- ((n_digits + 2) %/% 3) - 1
+      if (required_number_word > length(number_names)) {
+        stop("Number is too large.")
+      }
+      number <- paste(
+        Recall(collapse(digits[n_digits:(3*required_number_word + 1)]))
+        , number_names[required_number_word]
+        , ","
+        , Recall(collapse(digits[(3*required_number_word):1])))
+    }
+
+    number
+  }
+
+  collapse <- function(...) as.numeric(paste(..., collapse = ""))
+
+  clean_number <- function(x) {
+    x <- gsub("^\ +|\ +$", "", x)
+    x <- gsub("\ +,", ",", x)
+    gsub("(\ *,|-|\ +and)$", "", x)
+  }
+
+  if(length(x) > 1) {
+    return(
+      vapply(
+        x
+        , function(y) {
+          y_number <- clean_number(number_to_words(y))
+          if(capitalize) x_number <- capitalize(y_number)
+          y_number
+        }
+        , FUN.VALUE = "a"
+      )
+    )
+  }
+
+  x_number <- clean_number(number_to_words(x))
+  if(capitalize) x_number <- capitalize(x_number)
+  x_number
+}
+
+
+#' @rdname printnum
+#' @export
+
+printnum.numeric <- function(
   x
   , gt1 = TRUE
   , zero = TRUE
   , margin = 1
   , na_string = getOption("papaja.na_string")
+  , use_math = TRUE
   , ...
 ) {
   if(is.null(x)) stop("The parameter 'x' is NULL. Please provide a value for 'x'")
@@ -40,11 +163,13 @@ printnum <- function(
   validate(zero, check_class = "logical")
   validate(margin, check_class = "numeric", check_integer = TRUE, check_length = 1, check_range = c(1, 2))
   validate(na_string, check_class = "character", check_length = 1)
+  validate(use_math, check_class = "logical")
 
   ellipsis$x <- x
   ellipsis$gt1 <- gt1
   ellipsis$zero <- zero
   ellipsis$na_string <- na_string
+  ellipsis$use_math <- use_math
 
   ellipsis <- defaults(
     ellipsis
@@ -66,7 +191,7 @@ printnum <- function(
     }
   }
 
-  if(is.matrix(x) | is.data.frame(x)) {
+  if(is.matrix(x) ||is.data.frame(x)) {
     x_out <- apply(
       X = x
       , MARGIN = (3 - margin) # Parameters are applied according to margin
@@ -96,12 +221,46 @@ printnum <- function(
 }
 
 
-printnumber <- function(x, gt1 = TRUE, zero = TRUE, na_string = "", ...) {
+#' @rdname printnum
+#' @export
+
+printnum.data.frame <- function(
+  x
+  , ... # cleverly recycle (column-wise) over all possible parameters
+) {
+  as.data.frame(
+    mapply(
+      FUN = printnum
+      , x = x
+      , ...
+      , SIMPLIFY = FALSE
+    )
+    , stringsAsFactors = FALSE
+    , check.names = FALSE
+    , fix.empty.names = FALSE
+  )
+}
+
+#' @rdname printnum
+#' @export
+
+printnum.labelled <-function(x, ...){
+  x_out <- NextMethod("printnum")
+  variable_label(x_out) <- variable_label(x)
+  x_out
+}
+
+
+printnumber <- function(x, gt1 = TRUE, zero = TRUE, na_string = "", use_math = TRUE, ...) {
 
   ellipsis <- list(...)
   validate(x, check_class = "numeric", check_NA = FALSE, check_length = 1, check_infinite = FALSE)
   if(is.na(x)) return(na_string)
-  if(is.infinite(x)) return("$\\infty$")
+  if(is.infinite(x)) {
+    x_out <- paste0(ifelse(x < 0, "-", ""), "\\infty")
+    if(use_math) x_out <- paste0("$", x_out, "$")
+    return(x_out)
+  }
   if(!is.null(ellipsis$digits)) {
     validate(ellipsis$digits, "digits", check_class = "numeric", check_integer = TRUE, check_length = 1, check_range = c(0, Inf))
   }
@@ -152,7 +311,16 @@ printnumber <- function(x, gt1 = TRUE, zero = TRUE, na_string = "", ...) {
 }
 
 
-#' @describeIn printnum Convenience wrapper for \code{printnum} to print p-values with three decimal places.
+
+#' Prepare numeric values for printing as p-value
+#'
+#' Convenience wrapper for \code{printnum.numeric} to print p-values with three decimal places.
+#'
+#' @inheritParams printnum.numeric
+#' @examples
+#' printnum(0.05)
+#' printnum(0.0005)
+#' printnum(0.99999999)
 #' @export
 
 printp <- function(x, na_string = "") {

@@ -13,10 +13,10 @@ test_that(
     expect_equal(t_test_output$stat, "$t(17.78) = -1.86$, $p = .079$")
 
     expect_is(t_test_output$est, "character")
-    expect_equal(t_test_output$est, "$\\Delta M = 1.58$, 95\\% CI $[-3.37$, $0.21]$")
+    expect_equal(t_test_output$est, "$\\Delta M = -1.58$, 95\\% CI $[-3.37$, $0.21]$")
 
     expect_is(t_test_output$full, "character")
-    expect_equal(t_test_output$full, "$\\Delta M = 1.58$, 95\\% CI $[-3.37$, $0.21]$, $t(17.78) = -1.86$, $p = .079$")
+    expect_equal(t_test_output$full, "$\\Delta M = -1.58$, 95\\% CI $[-3.37$, $0.21]$, $t(17.78) = -1.86$, $p = .079$")
 
 #     t_test <- t.test(extra ~ group, data = sleep, var.equal = TRUE)
 #     t_test_output <- apa_print(t_test)
@@ -174,3 +174,46 @@ test_that(
   }
 )
 
+test_that(
+  "One-way ANOVA"
+  , {
+    oneway_test <- oneway.test(extra ~ group, data = sleep)
+    oneway_output <- apa_print(oneway_test)
+
+    expect_is(oneway_output, "list")
+    expect_equal(names(oneway_output), container_names)
+    expect_is(oneway_output$stat, "character")
+    expect_equal(oneway_output$stat, "$F(1, 17.78) = 3.46$, $p = .079$")
+  }
+)
+
+# Test for issue #192, confidence interval was confused with infty and extraneous $ symbols
+test_that(
+  "One-sided t test (with infty in CI)"
+  , {
+    t_out <- t.test(formula = yield ~ N, data = npk, alternative = "greater")
+    apa_out <- apa_print(t_out)
+
+    t2 <- t.test(formula = yield ~ N, data = npk, alternative = "less")
+    apa2 <- apa_print(t2)
+
+    # positive infinity ----
+    expect_identical(
+      object = apa_out$full_result
+      , expected = "$\\Delta M = -5.62$, 95\\% CI $[-9.54$, $\\infty]$, $t(21.88) = -2.46$, $p = .989$"
+    )
+    expect_identical(
+      object = apa_out$estimate
+      , expected = "$\\Delta M = -5.62$, 95\\% CI $[-9.54$, $\\infty]$"
+    )
+    # negative infinity ----
+    expect_identical(
+      object = apa2$full_result
+      , expected = "$\\Delta M = -5.62$, 95\\% CI $[-\\infty$, $-1.70]$, $t(21.88) = -2.46$, $p = .011$"
+    )
+    expect_identical(
+      object = apa2$estimate
+      , expected = "$\\Delta M = -5.62$, 95\\% CI $[-\\infty$, $-1.70]$"
+    )
+  }
+)
